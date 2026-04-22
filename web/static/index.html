@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Cookie Clicker</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #1a1a2e;
+      --surface:   #16213e;
+      --panel:     #0f3460;
+      --accent:    #e94560;
+      --accent2:   #f5a623;
+      --text:      #eaeaea;
+      --muted:     #8892a4;
+      --owned:     #2a9d5c;
+      --disabled:  #3a3a5c;
+      --radius:    12px;
+    }
+
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: grid;
+      grid-template-rows: auto 1fr;
+    }
+
+    /* ── Header ── */
+    header {
+      background: var(--surface);
+      border-bottom: 2px solid var(--panel);
+      padding: 1rem 2rem;
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+    header h1 { font-size: 1.4rem; font-weight: 700; letter-spacing: .05em; }
+    #status-dot {
+      width: 10px; height: 10px; border-radius: 50%;
+      background: #e94560;
+      transition: background .3s;
+    }
+    #status-dot.connected { background: var(--owned); }
+
+    /* ── Main layout ── */
+    main {
+      display: grid;
+      grid-template-columns: 1fr 340px;
+      gap: 0;
+      height: calc(100vh - 65px);
+    }
+
+    /* ── Cookie panel ── */
+    #cookie-panel {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 1.5rem;
+      padding: 2rem;
+    }
+
+    #cookie-count {
+      font-size: 3rem;
+      font-weight: 800;
+      text-align: center;
+      text-shadow: 0 0 20px rgba(233,69,96,.5);
+      line-height: 1.1;
+    }
+    #cookie-count span { display: block; font-size: 1rem; color: var(--muted); font-weight: 400; margin-top: .3rem; }
+
+    #cookie-btn {
+      width: 200px; height: 200px;
+      border-radius: 50%;
+      border: none;
+      cursor: pointer;
+      background: radial-gradient(circle at 35% 35%, #c97d35, #7a4a1e);
+      box-shadow: 0 0 0 6px #5a3315, 0 8px 32px rgba(0,0,0,.6);
+      font-size: 5rem;
+      line-height: 1;
+      transition: transform .08s, box-shadow .08s;
+      user-select: none;
+      -webkit-user-select: none;
+      position: relative;
+    }
+    #cookie-btn:hover { transform: scale(1.04); }
+    #cookie-btn:active {
+      transform: scale(0.94);
+      box-shadow: 0 0 0 6px #5a3315, 0 2px 12px rgba(0,0,0,.6);
+    }
+
+    /* click particle */
+    .particle {
+      position: fixed;
+      pointer-events: none;
+      font-size: 1.2rem;
+      font-weight: 700;
+      color: var(--accent2);
+      animation: floatUp .8s ease-out forwards;
+    }
+    @keyframes floatUp {
+      0%   { opacity: 1; transform: translateY(0) scale(1); }
+      100% { opacity: 0; transform: translateY(-60px) scale(.7); }
+    }
+
+    #cps-display {
+      font-size: 1rem;
+      color: var(--muted);
+    }
+
+    /* ── Upgrades panel ── */
+    #upgrade-panel {
+      background: var(--surface);
+      border-left: 2px solid var(--panel);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    #upgrade-panel h2 {
+      padding: 1rem 1.25rem;
+      font-size: 1rem;
+      text-transform: uppercase;
+      letter-spacing: .1em;
+      color: var(--muted);
+      border-bottom: 1px solid var(--panel);
+    }
+
+    #upgrade-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: .75rem;
+      display: flex;
+      flex-direction: column;
+      gap: .5rem;
+    }
+    #upgrade-list::-webkit-scrollbar { width: 6px; }
+    #upgrade-list::-webkit-scrollbar-track { background: transparent; }
+    #upgrade-list::-webkit-scrollbar-thumb { background: var(--panel); border-radius: 3px; }
+
+    .upgrade-card {
+      background: var(--panel);
+      border-radius: var(--radius);
+      padding: .85rem 1rem;
+      display: flex;
+      align-items: center;
+      gap: .75rem;
+      transition: background .2s, opacity .2s;
+      position: relative;
+      overflow: hidden;
+    }
+    .upgrade-card.owned {
+      background: linear-gradient(135deg, #1a4a35, #0d2e20);
+      border: 1px solid var(--owned);
+    }
+    .upgrade-card.affordable { cursor: pointer; }
+    .upgrade-card.affordable:hover { background: #1a4a6e; }
+    .upgrade-card.unaffordable { opacity: .55; }
+
+    .upgrade-icon {
+      font-size: 2rem;
+      width: 42px;
+      text-align: center;
+      flex-shrink: 0;
+    }
+
+    .upgrade-info { flex: 1; min-width: 0; }
+    .upgrade-name { font-weight: 600; font-size: .95rem; }
+    .upgrade-cps  { font-size: .75rem; color: var(--muted); margin-top: .15rem; }
+    .upgrade-cost { font-size: .8rem; color: var(--accent2); margin-top: .15rem; }
+    .owned-badge  {
+      font-size: .7rem;
+      background: var(--owned);
+      color: #fff;
+      padding: .15rem .5rem;
+      border-radius: 999px;
+      margin-top: .25rem;
+      display: inline-block;
+    }
+
+    /* progress bar showing affordability */
+    .upgrade-progress {
+      position: absolute;
+      bottom: 0; left: 0;
+      height: 3px;
+      background: var(--accent2);
+      transition: width .3s;
+      border-radius: 0 0 0 var(--radius);
+    }
+
+    /* ── Notification toast ── */
+    #toast {
+      position: fixed;
+      bottom: 1.5rem;
+      left: 50%;
+      transform: translateX(-50%) translateY(80px);
+      background: var(--accent);
+      color: #fff;
+      padding: .6rem 1.2rem;
+      border-radius: 999px;
+      font-size: .9rem;
+      font-weight: 600;
+      transition: transform .3s;
+      pointer-events: none;
+      z-index: 100;
+    }
+    #toast.show { transform: translateX(-50%) translateY(0); }
+
+    /* ── Reconnecting overlay ── */
+    #reconnect-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,.7);
+      z-index: 50;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      gap: 1rem;
+      font-size: 1.1rem;
+    }
+    #reconnect-overlay.visible { display: flex; }
+    .spinner {
+      width: 40px; height: 40px;
+      border: 4px solid var(--muted);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin .8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+
+<header>
+  <div id="status-dot"></div>
+  <h1>🍪 Cookie Clicker</h1>
+</header>
+
+<main>
+  <section id="cookie-panel">
+    <div id="cookie-count">
+      0 <span id="cps-display">0.00 cookies/sec</span>
+    </div>
+    <button id="cookie-btn" title="Click to earn cookies">🍪</button>
+  </section>
+
+  <aside id="upgrade-panel">
+    <h2>Upgrades</h2>
+    <div id="upgrade-list"></div>
+  </aside>
+</main>
+
+<div id="toast"></div>
+
+<div id="reconnect-overlay">
+  <div class="spinner"></div>
+  <span id="reconnect-msg">Reconnecting…</span>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  // ── Upgrade icons keyed by upgrade ID ──────────────────────────────────────
+  const ICONS = {
+    cursor:  '🖱️',
+    grandma: '👵',
+    farm:    '🌾',
+    mine:    '⛏️',
+    factory: '🏭',
+    bank:    '🏦',
+    temple:  '⛩️',
+  };
+
+  // ── State ──────────────────────────────────────────────────────────────────
+  let ws        = null;
+  let seq       = 0;          // monotonically increasing outbound sequence number
+  let token     = null;
+  let retryMs   = 500;        // reconnect backoff
+  let cookies   = 0;
+  let cps       = 0;
+  let upgrades  = [];
+
+  // ── DOM refs ───────────────────────────────────────────────────────────────
+  const cookieCount  = document.getElementById('cookie-count');
+  const cpsDisplay   = document.getElementById('cps-display');
+  const cookieBtn    = document.getElementById('cookie-btn');
+  const upgradeList  = document.getElementById('upgrade-list');
+  const statusDot    = document.getElementById('status-dot');
+  const toast        = document.getElementById('toast');
+  const overlay      = document.getElementById('reconnect-overlay');
+  const reconnectMsg = document.getElementById('reconnect-msg');
+
+  // ── Helpers ────────────────────────────────────────────────────────────────
+  function fmt(n) {
+    if (n >= 1e12) return (n / 1e12).toFixed(2) + ' trillion';
+    if (n >= 1e9)  return (n / 1e9).toFixed(2)  + ' billion';
+    if (n >= 1e6)  return (n / 1e6).toFixed(2)  + ' million';
+    if (n >= 1e3)  return (n / 1e3).toFixed(2)  + 'k';
+    return n.toFixed(n < 10 ? 1 : 0);
+  }
+
+  function nextSeq() { return ++seq; }
+
+  function send(obj) {
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify(obj));
+    }
+  }
+
+  let toastTimer = null;
+  function showToast(msg) {
+    toast.textContent = msg;
+    toast.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => toast.classList.remove('show'), 2500);
+  }
+
+  function spawnParticle(x, y) {
+    const el = document.createElement('div');
+    el.className = 'particle';
+    el.textContent = '+1';
+    el.style.left = (x - 12) + 'px';
+    el.style.top  = (y - 20) + 'px';
+    document.body.appendChild(el);
+    el.addEventListener('animationend', () => el.remove());
+  }
+
+  // ── Render ─────────────────────────────────────────────────────────────────
+  function renderState() {
+    cookieCount.childNodes[0].textContent = fmt(cookies) + ' cookie' + (cookies !== 1 ? 's' : '');
+    cpsDisplay.textContent = fmt(cps) + ' cookies/sec';
+
+    // Rebuild upgrade list only when the upgrade catalog changed.
+    if (upgradeList.children.length !== upgrades.length) {
+      upgradeList.innerHTML = '';
+      upgrades.forEach(u => {
+        const card = document.createElement('div');
+        card.className = 'upgrade-card';
+        card.dataset.id = u.id;
+        card.innerHTML = `
+          <div class="upgrade-icon">${ICONS[u.id] || '🔧'}</div>
+          <div class="upgrade-info">
+            <div class="upgrade-name">${u.name}</div>
+            <div class="upgrade-cps">+${u.cps_bonus} CPS</div>
+            <div class="upgrade-cost"></div>
+          </div>
+          <div class="upgrade-progress"></div>`;
+        card.addEventListener('click', () => {
+          if (!u.owned && cookies >= u.cost) {
+            send({ type: 'buy_upgrade', id: u.id, seq: nextSeq() });
+          }
+        });
+        upgradeList.appendChild(card);
+      });
+    }
+
+    // Update each card's dynamic state.
+    upgrades.forEach(u => {
+      const card = upgradeList.querySelector(`[data-id="${u.id}"]`);
+      if (!card) return;
+      const costEl     = card.querySelector('.upgrade-cost');
+      const progressEl = card.querySelector('.upgrade-progress');
+
+      card.classList.toggle('owned',       u.owned);
+      card.classList.toggle('affordable',  !u.owned && cookies >= u.cost);
+      card.classList.toggle('unaffordable',!u.owned && cookies <  u.cost);
+
+      if (u.owned) {
+        costEl.innerHTML = '<span class="owned-badge">Owned</span>';
+        progressEl.style.width = '100%';
+      } else {
+        costEl.textContent = fmt(u.cost) + ' cookies';
+        const pct = Math.min(1, cookies / u.cost) * 100;
+        progressEl.style.width = pct + '%';
+      }
+    });
+  }
+
+  // ── WebSocket ──────────────────────────────────────────────────────────────
+  async function fetchToken() {
+    const base = window.location.origin;
+    const resp = await fetch(base + '/session');
+    const data = await resp.json();
+    return data.token;
+  }
+
+  async function connect() {
+    try {
+      token = await fetchToken();
+    } catch (e) {
+      scheduleReconnect('Could not reach server…');
+      return;
+    }
+
+    const proto  = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const host   = window.location.host;
+    const wsURL  = `${proto}//${host}/ws?token=${token}`;
+
+    ws = new WebSocket(wsURL);
+
+    ws.onopen = () => {
+      statusDot.classList.add('connected');
+      overlay.classList.remove('visible');
+      retryMs = 500;
+    };
+
+    ws.onmessage = (ev) => {
+      let msg;
+      try { msg = JSON.parse(ev.data); } catch { return; }
+
+      if (msg.type === 'state') {
+        cookies  = msg.cookies  ?? cookies;
+        cps      = msg.cps      ?? cps;
+        upgrades = msg.upgrades ?? upgrades;
+        renderState();
+      } else if (msg.type === 'error') {
+        showToast(msg.message || msg.code);
+      }
+    };
+
+    ws.onclose = () => {
+      statusDot.classList.remove('connected');
+      scheduleReconnect('Connection lost…');
+    };
+
+    ws.onerror = () => {
+      ws.close();
+    };
+  }
+
+  function scheduleReconnect(reason) {
+    overlay.classList.add('visible');
+    reconnectMsg.textContent = `${reason} Retrying in ${(retryMs / 1000).toFixed(1)}s`;
+    setTimeout(connect, retryMs);
+    retryMs = Math.min(retryMs * 2, 30000);
+  }
+
+  // ── Click handler ──────────────────────────────────────────────────────────
+  cookieBtn.addEventListener('click', (ev) => {
+    send({ type: 'click', seq: nextSeq() });
+    // Optimistic local increment.
+    cookies += 1;
+    renderState();
+    spawnParticle(ev.clientX, ev.clientY);
+  });
+
+  // ── Boot ───────────────────────────────────────────────────────────────────
+  connect();
+})();
+</script>
+</body>
+</html>
